@@ -6,3 +6,139 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ConversationMemberRole {
+  OWNER
+  MEMBER
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  username     String  @unique
+  displayName  String
+  passwordHash String
+  avatar       String?
+
+  conversationMembers ConversationMember[]
+  messages            Message[]
+  reactions           Reaction[]
+  readReceipts        ReadReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id   String           @id @default(cuid())
+  type ConversationType
+
+  name   String?
+  avatar String?
+
+  members  ConversationMember[]
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ConversationMember {
+  id String @id @default(cuid())
+
+  conversationId String
+  userId         String
+
+  role ConversationMemberRole @default(MEMBER)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+  senderId       String
+  replyToId      String?
+
+  content  String
+  editedAt DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  replyTo Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies Message[] @relation("MessageReplies")
+
+  attachments  Attachment[]
+  reactions    Reaction[]
+  readReceipts ReadReceipt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model Attachment {
+  id String @id @default(cuid())
+
+  messageId String
+
+  storageKey String
+  fileName   String
+  mimeType   String
+  size       Int
+
+  message Message @relation(fields: [messageId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model Reaction {
+  id String @id @default(cuid())
+
+  messageId String
+  userId    String
+
+  emoji String
+
+  message Message @relation(fields: [messageId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model ReadReceipt {
+  id String @id @default(cuid())
+
+  messageId String
+  userId    String
+
+  readAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+}
